@@ -3,6 +3,7 @@ import random
 import numpy as np
 import os.path
 import scipy.misc
+import skimage.transform
 import shutil
 import zipfile
 import time
@@ -84,8 +85,8 @@ def gen_batch_function(data_folder, image_shape):
             for image_file in image_paths[batch_i:batch_i+batch_size]:
                 gt_image_file = label_paths[os.path.basename(image_file)]
 
-                image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
-                gt_image = scipy.misc.imresize(scipy.misc.imread(gt_image_file), image_shape)
+                image = skimage.transform.resize(scipy.misc.imread(image_file), image_shape)
+                gt_image = skimage.transform.resize(scipy.misc.imread(gt_image_file), image_shape)
 
                 gt_bg = np.all(gt_image == background_color, axis=2)
                 gt_bg = gt_bg.reshape(*gt_bg.shape, 1)
@@ -110,7 +111,7 @@ def gen_test_output(sess, logits, keep_prob, image_pl, data_folder, image_shape)
     :return: Output for for each test image
     """
     for image_file in glob(os.path.join(data_folder, 'image_2', '*.png')):
-        image = scipy.misc.imresize(scipy.misc.imread(image_file), image_shape)
+        image = skimage.transform.resize(scipy.misc.imread(image_file), image_shape)
 
         im_softmax = sess.run(
             [tf.nn.softmax(logits)],
