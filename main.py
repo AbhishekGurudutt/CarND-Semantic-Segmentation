@@ -5,7 +5,6 @@ import warnings
 from distutils.version import LooseVersion
 import project_tests as tests
 
-
 # Check TensorFlow Version
 assert LooseVersion(tf.__version__) >= LooseVersion('1.0'), 'Please use TensorFlow version 1.0 or newer.  You are using {}'.format(tf.__version__)
 print('TensorFlow Version: {}'.format(tf.__version__))
@@ -15,6 +14,7 @@ if not tf.test.gpu_device_name():
     warnings.warn('No GPU found. Please use a GPU to train your neural network.')
 else:
     print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+
 
 
 def load_vgg(sess, vgg_path):
@@ -59,34 +59,34 @@ def layers(vgg_layer3_out, vgg_layer4_out, vgg_layer7_out, num_classes):
     """
     # TODO: Implement function
     # 2: Implement layers function
-    conv7 = tf.layers.conv2d(vgg_layer7_out, 16, 3, strides=(1,1), padding='same',
+    conv7 = tf.layers.conv2d(vgg_layer7_out, num_classes, 1, padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
-    conv4 = tf.layers.conv2d(vgg_layer4_out, 16, 3, strides=(1,1), padding='same',
+    conv4 = tf.layers.conv2d(vgg_layer4_out, num_classes, 1, padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
-    conv3 = tf.layers.conv2d(vgg_layer3_out, 16, 3, strides=(1,1), padding='same',
+    conv3 = tf.layers.conv2d(vgg_layer3_out, num_classes, 1, padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     # upsample by 2
-    upsamp_32x = tf.layers.conv2d_transpose(conv7, 16, 3, strides=(2, 2), padding='same',
+    upsamp_1 = tf.layers.conv2d_transpose(conv7, num_classes, 4, strides=(2, 2), padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
 
     # add skip connection and upsample by 2
-    skip_add_1 = tf.add(upsamp_32x, conv4)
-    upsamp_16x = tf.layers.conv2d_transpose(skip_add_1, 16, 3, strides=(4, 4), padding='same',
+    skip_add_1 = tf.add(upsamp_1, conv4)
+    upsamp_2 = tf.layers.conv2d_transpose(skip_add_1, num_classes, 4, strides=(2, 2), padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
     #print (upsamp_16x)
     # add skip connection and upsample by 8
-    skip_add_2 = tf.add(upsamp_16x, conv3)
-    output = tf.layers.conv2d_transpose(skip_add_2, num_classes, 3, strides=(2, 2), padding='same',
+    skip_add_2 = tf.add(upsamp_2, conv3)
+    output = tf.layers.conv2d_transpose(skip_add_2, num_classes, 16, strides=(8, 8), padding='same',
                                 kernel_initializer=tf.random_normal_initializer(stddev=0.01),
                                 kernel_regularizer=tf.contrib.layers.l2_regularizer(1e-3))
 
@@ -115,8 +115,7 @@ def optimize(nn_last_layer, correct_label, learning_rate, num_classes):
             labels=labels, logits=logits)
         )
 
-
-    train_op = tf.train.AdamOptimizer(learning_rate).minimize(cross_entropy_loss)
+    train_op = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy_loss)
 
     return logits, train_op, cross_entropy_loss
 
@@ -139,13 +138,18 @@ def train_nn(sess, epochs, batch_size, get_batches_fn, train_op, cross_entropy_l
     :param learning_rate: TF Placeholder for learning rate
     """
     # TODO: Implement function
+    sess.run(tf.global_variables_initializer())
+
+    print('Starting training... for {} epochs'.format(epochs))
+    print()
+
     for epoch_i in range(epochs):
         for images, labels in get_batches_fn(batch_size):
             _, loss = sess.run([train_op, cross_entropy_loss], feed_dict={input_image: images,
                                                                           correct_label: labels,
                                                                           keep_prob: 0.5,
                                                                           learning_rate: 0.0001})
-        print('Epoch {}/{}; Training Loss:{:.03f}'.format(epoch_i + 1, epochs, loss))
+            print('Epoch {}/{}; Training Loss:{:.03f}'.format(epoch_i + 1, epochs, loss))
 
     #pass
 tests.test_train_nn(train_nn)
@@ -167,8 +171,8 @@ def run():
 
     tf.reset_default_graph()
 
-    epochs = 1
-    batch_size = 2
+    epochs = 25
+    batch_size = 4
 
     with tf.Session() as sess:
         # Path to vgg model
@@ -180,7 +184,7 @@ def run():
         #  https://datascience.stackexchange.com/questions/5224/how-to-prepare-augment-images-for-neural-network
 
         # TODO: Build NN using load_vgg, layers, and optimize function
-        correct_label = tf.placeholder(dtype=tf.float32, shape=(None, None, None, num_classes), name='correct_label')
+        correct_label = tf.placeholder(dtype=tf.int32, shape=(None, None, None, num_classes), name='correct_label')
         learning_rate = tf.placeholder(dtype=tf.float32, name='learning_rate')
 
         vgg_input, vgg_keep_prob, vgg_layer3_out, vgg_layer4_out, vgg_layer7_out = load_vgg(sess, vgg_path)
